@@ -3,107 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Silent Notes</title>
+    <title>Silent Notes 2.0</title>
     
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         :root {
             --bg: #fafafa; --text: #18181b; --surface: #ffffff; --border: #e4e4e7;
-            --primary: #52525b; --accent: #2563eb; --accent-fg: #ffffff;
+            --primary: #52525b; --accent: #2563eb; --accent-hover: #1d4ed8;
             --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
             --font-ui: 'Inter', system-ui, sans-serif;
             --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
             --shadow: 0 4px 12px -2px rgba(0,0,0,0.08);
+            --radius: 8px;
         }
 
         [data-theme="dark"] {
             --bg: #09090b; --text: #e4e4e7; --surface: #18181b; --border: #27272a; 
-            --primary: #a1a1aa; --accent: #3b82f6;
+            --primary: #a1a1aa; --accent: #3b82f6; --accent-hover: #60a5fa;
         }
 
-        * { box-sizing: border-box; outline: none; }
-        body { margin: 0; font-family: var(--font-ui); background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; transition: background 0.3s, color 0.3s; }
+        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; font-family: var(--font-ui); background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; transition: background 0.3s, color 0.3s; overflow: hidden; }
 
         /* --- Header --- */
-        header { padding: 0.8rem 1.2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface); z-index: 20; transition: transform 0.3s; }
-        .logo { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; user-select: none; }
-        .toolbar { display: flex; gap: 6px; align-items: center; }
+        header { padding: 0.8rem 1.2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface); z-index: 20; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .logo { font-weight: 800; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; user-select: none; color: var(--text); }
+        .logo i { color: var(--accent); font-size: 1.4rem; }
+        .toolbar-header { display: flex; gap: 8px; align-items: center; }
 
-        /* Buttons */
-        button { padding: 0.5rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; font-size: 0.9rem; }
-        button:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+        /* Generic Button Styles */
+        button { padding: 0.5rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; border-radius: var(--radius); display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1); font-size: 0.9rem; position: relative; overflow: hidden; }
+        button:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        button:active { transform: translateY(0); }
+        
         button.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
-        button.primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        button.primary:hover { opacity: 0.9; background: var(--accent); border-color: var(--accent); color: white; }
         button.danger { border-color: var(--danger); color: var(--danger); }
         button.danger:hover { background: var(--danger); color: white; }
         
-        button span { font-weight: 500; font-size: 0.8rem; }
-        button i { font-size: 1.1rem; }
+        /* Dropdown Menu for Export */
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-content { display: none; position: absolute; right: 0; top: 110%; background: var(--surface); min-width: 160px; box-shadow: var(--shadow); border: 1px solid var(--border); border-radius: var(--radius); z-index: 100; }
+        .dropdown-content button { width: 100%; border: none; justify-content: flex-start; border-radius: 0; text-align: left; padding: 0.8rem 1rem; }
+        .dropdown-content button:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+        .dropdown-content button:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+        .dropdown:hover .dropdown-content { display: block; }
 
-        /* --- Main Layout --- */
+        /* --- Editor & Format Bar --- */
         main { flex: 1; display: flex; overflow: hidden; position: relative; }
-        .pane { flex: 1; display: flex; flex-direction: column; overflow-y: auto; transition: width 0.3s; }
-        .pane.editor { border-right: 1px solid var(--border); padding: 1.5rem; }
-        .pane.preview { padding: 1.5rem 2rem; background: var(--surface); }
+        .pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; transition: flex 0.3s; }
+        .pane.editor { border-right: 1px solid var(--border); background: var(--bg); }
+        .pane.preview { background: var(--surface); }
 
-        /* Editor */
-        textarea { width: 100%; height: 100%; border: none; resize: none; background: transparent; color: var(--text); font-size: 1rem; line-height: 1.6; font-family: var(--font-mono); padding: 0; }
+        /* Format Toolbar */
+        .format-bar { padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; gap: 4px; overflow-x: auto; align-items: center; }
+        .format-bar button { padding: 4px 8px; font-size: 1rem; border: none; background: transparent; color: var(--primary); }
+        .format-bar button:hover { background: var(--bg); color: var(--accent); border: none; box-shadow: none; }
+        .divider { width: 1px; height: 16px; background: var(--border); margin: 0 6px; }
+
+        textarea { flex: 1; width: 100%; border: none; resize: none; background: transparent; color: var(--text); font-size: 1rem; line-height: 1.6; font-family: var(--font-mono); padding: 1.5rem; outline: none; }
         textarea::placeholder { color: var(--primary); opacity: 0.5; }
 
-        /* Preview Markdown Styles */
-        #preview { line-height: 1.7; font-size: 1rem; color: var(--text); }
+        /* Preview Styles */
+        #preview-container { flex: 1; overflow-y: auto; padding: 2rem 3rem; }
+        #preview { line-height: 1.8; font-size: 1.05rem; color: var(--text); max-width: 800px; margin: 0 auto; }
         #preview h1, #preview h2, #preview h3 { margin-top: 1.5em; margin-bottom: 0.5em; color: var(--text); letter-spacing: -0.02em; }
-        #preview h1 { border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-        #preview a { color: var(--accent); text-decoration: none; }
-        #preview a:hover { text-decoration: underline; }
-        #preview blockquote { border-left: 3px solid var(--accent); margin: 1em 0; padding-left: 1rem; color: var(--primary); font-style: italic; }
-        #preview code { background: var(--border); padding: 0.2em 0.4em; border-radius: 4px; font-family: var(--font-mono); font-size: 0.85em; }
-        #preview pre { background: #1e1e1e; padding: 1rem; border-radius: 8px; overflow-x: auto; }
-        #preview pre code { background: transparent; padding: 0; color: #e4e4e7; }
-        #preview img { max-width: 100%; border-radius: 6px; box-shadow: var(--shadow); }
-        #preview ul, #preview ol { padding-left: 1.5rem; }
-
-        /* --- Zen Mode --- */
-        body.zen-mode header, body.zen-mode .footer, body.zen-mode .pane.preview { display: none !important; }
-        body.zen-mode .pane.editor { border-right: none; max-width: 800px; margin: 0 auto; padding-top: 4rem; }
-        body.zen-mode #btnZenExit { display: flex; }
-
-        #btnZenExit { display: none; position: fixed; top: 20px; right: 20px; z-index: 50; opacity: 0.5; }
-        #btnZenExit:hover { opacity: 1; }
+        #preview h1 { border-bottom: 1px solid var(--border); padding-bottom: 0.3em; color: var(--accent); }
+        #preview a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+        #preview a:hover { text-decoration: none; border-bottom-style: solid; }
+        #preview blockquote { border-left: 4px solid var(--accent); margin: 1.5em 0; padding-left: 1rem; background: rgba(125,125,125,0.05); padding: 1rem; border-radius: 0 var(--radius) var(--radius) 0; }
+        #preview code { background: var(--border); padding: 0.2em 0.4em; border-radius: 4px; font-family: var(--font-mono); font-size: 0.85em; color: var(--text); }
+        #preview pre { background: #1e1e1e; padding: 1rem; border-radius: 8px; overflow-x: auto; box-shadow: var(--shadow); }
+        #preview pre code { background: transparent; padding: 0; color: #e4e4e7; border: none; }
+        #preview img { max-width: 100%; border-radius: var(--radius); box-shadow: var(--shadow); margin: 1rem 0; }
+        #preview table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        #preview th, #preview td { border: 1px solid var(--border); padding: 0.5rem; text-align: left; }
+        #preview th { background: rgba(125,125,125,0.1); }
+        
+        /* KaTeX Corrections */
+        .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.5rem 0; }
+        .katex { font-size: 1.1em; }
 
         /* --- Footer --- */
         .footer { padding: 0.4rem 1.2rem; border-top: 1px solid var(--border); background: var(--surface); font-size: 0.75rem; color: var(--primary); display: flex; justify-content: space-between; align-items: center; z-index: 20; }
         .stats { display: flex; gap: 15px; }
 
-        /* Badges */
-        .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+        /* --- Badges & Utility --- */
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
         .badge.secure { background: var(--success); color: white; }
         .badge.live { background: var(--danger); color: white; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
+        /* --- Zen Mode --- */
+        body.zen-mode header, body.zen-mode .footer, body.zen-mode .pane.preview, body.zen-mode .format-bar { display: none !important; }
+        body.zen-mode .pane.editor { border-right: none; max-width: 800px; margin: 0 auto; padding-top: 2rem; }
+        body.zen-mode #btnZenExit { display: flex; }
+        #btnZenExit { display: none; position: fixed; top: 20px; right: 20px; z-index: 50; opacity: 0.5; width: 40px; height: 40px; border-radius: 50%; }
+        #btnZenExit:hover { opacity: 1; }
+
         /* --- Modals --- */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); z-index: 100; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.2s; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.2s; }
         .modal.open { display: flex; opacity: 1; }
-        .modal-content { background: var(--surface); padding: 2rem; border-radius: 12px; width: 90%; max-width: 360px; box-shadow: var(--shadow); border: 1px solid var(--border); transform: translateY(10px); transition: transform 0.2s; }
-        .modal.open .modal-content { transform: translateY(0); }
-        .modal h3 { margin-top: 0; display: flex; align-items: center; gap: 10px; font-size: 1.1rem; }
+        .modal-content { background: var(--surface); padding: 2rem; border-radius: 12px; width: 90%; max-width: 380px; box-shadow: var(--shadow); border: 1px solid var(--border); transform: scale(0.95); transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .modal.open .modal-content { transform: scale(1); }
+        .modal h3 { margin-top: 0; display: flex; align-items: center; gap: 10px; font-size: 1.2rem; color: var(--text); }
         
         .pwd-row { display: flex; gap: 8px; margin-bottom: 10px; margin-top: 15px; }
         .pwd-row input { flex: 1; padding: 0.7rem; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 6px; font-family: var(--font-mono); font-size: 1rem; }
         .pwd-row input:focus { border-color: var(--accent); }
-        
-        .strength-bar { height: 4px; border-radius: 2px; background: var(--border); width: 0%; transition: width 0.3s, background 0.3s; margin-top: 6px; }
-        .strength-text { font-size: 0.7rem; margin-top: 4px; display: block; text-align: right; font-weight: 600; min-height: 1rem; }
-        
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; }
 
         /* --- Toasts --- */
@@ -118,10 +142,19 @@
         /* Mobile Responsive */
         @media (max-width: 768px) {
             main { flex-direction: column; }
-            .pane { height: 50%; padding: 1rem; }
+            .pane { height: 50%; padding: 0; }
             .pane.editor { border-right: none; border-bottom: 1px solid var(--border); }
-            .toolbar button span { display: none; }
-            .footer { flex-direction: column; gap: 5px; align-items: flex-start; }
+            .toolbar-header button span { display: none; }
+            .format-bar { padding: 4px; }
+            #preview-container { padding: 1rem; }
+        }
+
+        /* Print/PDF Specific */
+        @media print {
+            body { background: white; color: black; }
+            header, .footer, .format-bar, .pane.editor, #toast-container, #btnZenExit { display: none !important; }
+            main, .pane.preview { height: auto; overflow: visible; }
+            #preview-container { padding: 0; margin: 0; }
         }
     </style>
 </head>
@@ -135,24 +168,58 @@
         <span id="securityBadge" class="badge secure" style="display:none"><i class="ph ph-lock-key"></i> SECURE</span>
         <span id="liveBadge" class="badge live" style="display:none"><i class="ph ph-broadcast"></i> LIVE</span>
     </div>
-    <div class="toolbar">
-        <button onclick="toggleZenMode()" title="Zen Mode (Focus)"><i class="ph ph-frame-corners"></i></button>
+    <div class="toolbar-header">
+        <button onclick="confirmNewNote()" title="Nuova Nota"><i class="ph ph-plus"></i></button>
+        <div style="width:1px; height:20px; background:var(--border); margin:0 2px;"></div>
+        
+        <button onclick="toggleZenMode()" title="Focus Mode"><i class="ph ph-frame-corners"></i></button>
         <button onclick="toggleTheme()" id="btnTheme" title="Tema"><i class="ph ph-moon"></i></button>
-        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
-        <button onclick="downloadNote()" title="Scarica File .md"><i class="ph ph-download-simple"></i></button>
+        
+        <div class="dropdown">
+            <button class="primary" title="Esporta"><i class="ph ph-export"></i> <span>Salva</span></button>
+            <div class="dropdown-content">
+                <button onclick="downloadMD()"><i class="ph ph-file-md"></i> Markdown (.md)</button>
+                <button onclick="downloadPDF()"><i class="ph ph-file-pdf"></i> PDF Document</button>
+                <button onclick="downloadTXT()"><i class="ph ph-file-text"></i> Testo (.txt)</button>
+            </div>
+        </div>
+
         <button onclick="handleLiveClick()" id="btnLive" title="P2P Session"><i class="ph ph-broadcast"></i> <span>P2P</span></button>
         <button onclick="openPasswordModal()" id="btnLock" title="Sicurezza"><i class="ph ph-lock-open"></i></button>
         <button onclick="openQRModal()" title="Mobile QR"><i class="ph ph-qr-code"></i></button>
-        <button onclick="copyLink()" class="primary" title="Salva/Copia"><i class="ph ph-link"></i> <span>Copia Link</span></button>
+        <button onclick="copyLink()" title="Copia Link"><i class="ph ph-link"></i></button>
     </div>
 </header>
 
 <main>
     <div class="pane editor">
-        <textarea id="editor" placeholder="# Benvenuto su Silent Notes&#10;Inizia a scrivere qui. Tutto viene salvato nell'URL.&#10;&#10;- Nessun server&#10;- Crittografia AES&#10;- Markdown supportato"></textarea>
+        <div class="format-bar">
+            <button onclick="undo()" title="Annulla (Ctrl+Z)"><i class="ph ph-arrow-u-up-left"></i></button>
+            <button onclick="redo()" title="Ripeti (Ctrl+Y)"><i class="ph ph-arrow-u-up-right"></i></button>
+            <div class="divider"></div>
+            <button onclick="insertFormat('**', '**')" title="Grassetto"><i class="ph ph-text-b"></i></button>
+            <button onclick="insertFormat('_', '_')" title="Corsivo"><i class="ph ph-text-italic"></i></button>
+            <button onclick="insertFormat('~~', '~~')" title="Barrato"><i class="ph ph-text-strikethrough"></i></button>
+            <div class="divider"></div>
+            <button onclick="insertFormat('### ', '')" title="Titolo"><i class="ph ph-text-h"></i></button>
+            <button onclick="insertFormat('- ', '')" title="Lista"><i class="ph ph-list-bullets"></i></button>
+            <button onclick="insertFormat('1. ', '')" title="Lista Numerata"><i class="ph ph-list-numbers"></i></button>
+            <button onclick="insertFormat('> ', '')" title="Citazione"><i class="ph ph-quotes"></i></button>
+            <div class="divider"></div>
+            <button onclick="insertFormat('`', '`')" title="Codice Inline"><i class="ph ph-code"></i></button>
+            <button onclick="insertFormat('```\n', '\n```')" title="Blocco Codice"><i class="ph ph-code-block"></i></button>
+            <button onclick="insertFormat('$$ ', ' $$')" title="Formula LaTeX"><i class="ph ph-function"></i></button>
+            <div class="divider"></div>
+            <button onclick="insertFormat('![Alt](', ')')" title="Immagine"><i class="ph ph-image"></i></button>
+            <button onclick="insertFormat('[Testo](', ')')" title="Link"><i class="ph ph-link-simple"></i></button>
+        </div>
+
+        <textarea id="editor" spellcheck="false" placeholder="# Benvenuto su Silent Notes v2.0&#10;Inizia a scrivere. Usa la toolbar per formattare.&#10;&#10;Supporto Matematica: $$ E = mc^2 $$"></textarea>
     </div>
     <div class="pane preview">
-        <div id="preview"></div>
+        <div id="preview-container">
+            <div id="preview"></div>
+        </div>
     </div>
 </main>
 
@@ -170,16 +237,13 @@
     <div class="modal-content">
         <h3><i class="ph ph-shield-check"></i> Proteggi Nota</h3>
         <p style="font-size: 0.9rem; color: var(--primary); margin:0;">Crittografia AES-256 lato client.</p>
-        
         <div class="pwd-row">
             <input type="password" id="passwordInput" placeholder="Scegli password..." oninput="checkStrength(this.value)">
             <button onclick="toggleVisibility('passwordInput', this)" title="Vedi"><i class="ph ph-eye"></i></button>
-            <button onclick="generateSecurePassword()" title="Genera"><i class="ph ph-magic-wand"></i></button>
         </div>
-        
-        <div id="strengthBar" class="strength-bar"></div>
-        <span id="strengthText" class="strength-text"></span>
-
+        <div style="height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-top:5px;">
+             <div id="strengthBar" style="height:100%; width:0%; transition:0.3s;"></div>
+        </div>
         <div class="modal-actions">
             <button onclick="closeModal('passwordModal')">Annulla</button>
             <button onclick="applyPassword()" class="primary">Applica</button>
@@ -190,13 +254,24 @@
 <div id="decryptModal" class="modal">
     <div class="modal-content">
         <h3><i class="ph ph-lock-key"></i> Nota Cifrata</h3>
-        <p style="font-size: 0.9rem; color: var(--primary); margin:0;">Questa nota è protetta.</p>
+        <p style="font-size: 0.9rem; color: var(--primary);">Inserisci password per visualizzare.</p>
         <div class="pwd-row">
-            <input type="password" id="decryptInput" placeholder="Inserisci password">
+            <input type="password" id="decryptInput" placeholder="Password">
             <button onclick="toggleVisibility('decryptInput', this)"><i class="ph ph-eye"></i></button>
         </div>
         <div class="modal-actions">
-            <button onclick="attemptDecrypt()" class="primary" style="width: 100%">Sblocca Nota</button>
+            <button onclick="attemptDecrypt()" class="primary" style="width: 100%">Sblocca</button>
+        </div>
+    </div>
+</div>
+
+<div id="newNoteModal" class="modal">
+    <div class="modal-content">
+        <h3><i class="ph ph-file-plus"></i> Nuova Nota</h3>
+        <p>Sei sicuro? La nota attuale verrà cancellata se non salvata.</p>
+        <div class="modal-actions">
+            <button onclick="closeModal('newNoteModal')">Annulla</button>
+            <button onclick="executeNewNote()" class="danger">Crea Nuova</button>
         </div>
     </div>
 </div>
@@ -204,17 +279,16 @@
 <div id="qrModal" class="modal" onclick="if(event.target === this) closeModal('qrModal')">
     <div class="modal-content" style="text-align: center;">
         <h3>Codice QR</h3>
-        <p id="qrTextDesc" style="font-size: 0.85rem; color: var(--primary);">Scansiona per portare la nota su mobile.</p>
+        <p id="qrTextDesc" style="font-size: 0.85rem; color: var(--primary); margin-bottom:10px">Scansiona per mobile.</p>
         <div id="qrcode"></div>
-        <button onclick="closeModal('qrModal')" style="margin-top:10px">Chiudi</button>
+        <button onclick="closeModal('qrModal')" style="margin-top:15px; width:100%">Chiudi</button>
     </div>
 </div>
 
 <script>
-    // --- Configurazione ---
+    // --- Configurazione & Stato ---
     const editor = document.getElementById('editor');
     const preview = document.getElementById('preview');
-    // Limite di sicurezza per URL nei browser (2048 è standard sicuro, anche se Chrome supporta di più)
     const MAX_SAFE_URL = 2000; 
     
     let currentPassword = null;
@@ -225,57 +299,172 @@
     let isGuest = false;
     let ignoreChange = false;
 
+    // --- History Manager (Undo/Redo) ---
+    class HistoryManager {
+        constructor(limit = 50) {
+            this.stack = [];
+            this.currentIndex = -1;
+            this.limit = limit;
+        }
+        push(state) {
+            if (this.currentIndex < this.stack.length - 1) {
+                this.stack = this.stack.slice(0, this.currentIndex + 1);
+            }
+            this.stack.push(state);
+            if (this.stack.length > this.limit) this.stack.shift();
+            else this.currentIndex++;
+        }
+        undo() {
+            if (this.currentIndex > 0) {
+                this.currentIndex--;
+                return this.stack[this.currentIndex];
+            }
+            return null;
+        }
+        redo() {
+            if (this.currentIndex < this.stack.length - 1) {
+                this.currentIndex++;
+                return this.stack[this.currentIndex];
+            }
+            return null;
+        }
+        reset(initialState) {
+            this.stack = [initialState];
+            this.currentIndex = 0;
+        }
+    }
+    const historyMgr = new HistoryManager();
+
     // --- Inizializzazione ---
     window.addEventListener('DOMContentLoaded', () => {
-        // Setup Highlight.js e Marked
+        // Configurazione Marked + HighlightJS
         marked.setOptions({
-            highlight: function(code, lang) {
+            highlight: (code, lang) => {
                 const language = highlight.getLanguage(lang) ? lang : 'plaintext';
                 return highlight.highlight(code, { language }).value;
             },
-            langPrefix: 'hljs language-' // necessario per highlight.js
+            breaks: true,
+            gfm: true
         });
 
         // Setup Tema
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setTheme('dark');
-        } else {
-            setTheme('light');
-        }
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+        else setTheme('light');
         
         // Listeners
         setupEnterKey('passwordInput', applyPassword);
         setupEnterKey('decryptInput', attemptDecrypt);
         
         checkHash();
-        updateStats(); // Initial stats check
+        historyMgr.push(editor.value); // Stato iniziale
+        updateStats();
     });
 
     window.addEventListener('hashchange', checkHash);
 
-    function setupEnterKey(id, callback) {
-        document.getElementById(id).addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') callback();
-        });
-    }
-
-    // --- Core Logic ---
-    editor.addEventListener('input', () => {
+    // --- Core Editor Logic ---
+    editor.addEventListener('input', (e) => {
         if (ignoreChange) return;
+        
+        // Salva stato history solo su modifiche significative (debounce si potrebbe aggiungere)
+        if (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo') {
+             historyMgr.push(editor.value);
+        }
+
         updatePreview();
         updateURLAndBroadcast();
     });
 
+    // Intercetta scorciatoie tastiera
+    editor.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            undo();
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+            e.preventDefault();
+            redo();
+        }
+    });
+
+    function undo() {
+        const state = historyMgr.undo();
+        if (state !== null) restoreState(state);
+    }
+
+    function redo() {
+        const state = historyMgr.redo();
+        if (state !== null) restoreState(state);
+    }
+
+    function restoreState(content) {
+        ignoreChange = true;
+        editor.value = content;
+        updatePreview();
+        updateURLAndBroadcast();
+        ignoreChange = false;
+    }
+
+    function insertFormat(start, end) {
+        const el = editor;
+        const selStart = el.selectionStart;
+        const selEnd = el.selectionEnd;
+        const text = el.value;
+        const before = text.substring(0, selStart);
+        const selection = text.substring(selStart, selEnd);
+        const after = text.substring(selEnd);
+
+        // Se multiline e stiamo applicando lista o codice blocco
+        let insertText = "";
+        let newCursorPos = 0;
+
+        if (start === '```\n' && selection.indexOf('\n') !== -1) {
+            // Block code logic
+            insertText = start + selection + end;
+            newCursorPos = selStart + start.length + selection.length + end.length;
+        } else {
+             insertText = start + selection + end;
+             newCursorPos = selStart + start.length + selection.length; // Cursor after selection
+             if(selection.length === 0) newCursorPos = selStart + start.length; // Cursor inside
+        }
+
+        el.value = before + insertText + after;
+        el.selectionStart = el.selectionEnd = newCursorPos;
+        el.focus();
+        
+        historyMgr.push(el.value);
+        updatePreview();
+        updateURLAndBroadcast();
+    }
+
     function updatePreview() {
-        preview.innerHTML = marked.parse(editor.value);
+        // 1. Render Markdown
+        let html = marked.parse(editor.value);
+        preview.innerHTML = html;
+
+        // 2. Render LaTeX (KaTeX)
+        renderMathInElement(preview, {
+            delimiters: [
+                {left: '$$', right: '$$', display: true},
+                {left: '$', right: '$', display: false},
+                {left: '\\(', right: '\\)', display: false},
+                {left: '\\[', right: '\\]', display: true}
+            ],
+            throwOnError: false
+        });
+
+        // 3. Animazione
+        preview.classList.remove('animate-fade');
+        void preview.offsetWidth; // Trigger reflow
+        preview.classList.add('animate-fade');
+
         updateStats();
     }
 
+    // --- Hash Management & Encryption (Invariato per compatibilità) ---
     function checkHash() {
         if (ignoreChange) return;
         const hash = window.location.hash.substring(1);
         
-        // Se hash vuoto, pulisci editor
         if (!hash) {
             if(editor.value !== "") {
                  editor.value = "";
@@ -298,6 +487,7 @@
                 const txt = LZString.decompressFromEncodedURIComponent(val);
                 if (txt !== null) { 
                     editor.value = txt; 
+                    historyMgr.reset(txt);
                     updatePreview(); 
                 }
             } catch(e) { console.error("Errore decompressione", e); }
@@ -310,7 +500,6 @@
 
         if (currentPassword) {
             const encrypted = CryptoJS.AES.encrypt(text, currentPassword).toString();
-            // HMAC per integrità
             const signature = CryptoJS.HmacSHA256(encrypted, currentPassword).toString();
             const packed = JSON.stringify({ ct: encrypted, sig: signature });
             return { mode: 'enc', data: LZString.compressToEncodedURIComponent(packed) };
@@ -323,124 +512,119 @@
         const payload = generatePayload();
         
         if (!isGuest) {
-            // FIX PERCENTUALE: Se non ci sono dati, rimuovi l'hash completamente
             if (!payload.data) {
-                history.replaceState(null, null, ' '); // Rimuove hash mantenendo la pagina
+                history.replaceState(null, null, ' ');
             } else {
                 const hash = `#${payload.mode}=${payload.data}`;
                 if(!isHost) history.replaceState(null, null, hash);
             }
         }
-
         updateSecurityUI(payload.mode === 'enc');
-        updateStats(); // Ricalcola stats dopo update URL
-
+        
         if (conn && conn.open) {
             conn.send({ type: 'update', mode: payload.mode, data: payload.data });
         }
     }
 
-    // --- Features Avanzate ---
-    
-    function toggleZenMode() {
-        document.body.classList.toggle('zen-mode');
-        showToast(document.body.classList.contains('zen-mode') ? "Zen Mode Attiva" : "Zen Mode Disattivata");
+    // --- Export Functions ---
+    function confirmNewNote() {
+        if(editor.value.trim().length > 0) openModal('newNoteModal');
+        else showToast("La nota è già vuota", "info");
     }
 
-    function downloadNote() {
-        const text = editor.value;
-        if(!text) { showToast("Niente da scaricare", "error"); return; }
-        
-        const blob = new Blob([text], { type: "text/markdown" });
+    function executeNewNote() {
+        ignoreChange = true;
+        editor.value = "";
+        currentPassword = null;
+        updateURLAndBroadcast();
+        updatePreview();
+        historyMgr.reset("");
+        closeModal('newNoteModal');
+        ignoreChange = false;
+        showToast("Nuova nota creata", "success");
+    }
+
+    function downloadMD() {
+        downloadFile("silent-note.md", editor.value, "text/markdown");
+    }
+
+    function downloadTXT() {
+        downloadFile("silent-note.txt", editor.value, "text/plain");
+    }
+
+    function downloadFile(name, content, type) {
+        if(!content) return showToast("Niente da salvare", "error");
+        const blob = new Blob([content], { type: type });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "silent-note.md";
+        a.download = name;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        showToast("Nota scaricata!", "success");
+        showToast("Scaricato: " + name, "success");
     }
 
-    // --- Stats & Logic Percentuale ---
+    function downloadPDF() {
+        const element = document.getElementById('preview');
+        if(!editor.value) return showToast("Niente da salvare", "error");
+
+        const opt = {
+            margin:       1,
+            filename:     'silent-note.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        
+        // Temporaneamente forza tema chiaro per il PDF
+        const wasDark = document.body.getAttribute('data-theme') === 'dark';
+        if(wasDark) document.body.setAttribute('data-theme', 'light');
+
+        showToast("Generazione PDF...", "info");
+        html2pdf().set(opt).from(element).save().then(() => {
+            if(wasDark) document.body.setAttribute('data-theme', 'dark');
+            showToast("PDF Scaricato", "success");
+        });
+    }
+
+    // --- Stats ---
     function updateStats() {
         const text = editor.value;
-        
-        // Conteggio parole e caratteri
         const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-        document.getElementById('charCount').innerHTML = `<i class="ph ph-text-t"></i> ${text.length} car | ${words} parole`;
+        document.getElementById('charCount').innerHTML = `<i class="ph ph-text-t"></i> ${text.length} | ${words} parole`;
         
-        // Tempo lettura (media 200 parole/min)
         const min = Math.ceil(words / 200);
         document.getElementById('readTime').innerHTML = `<i class="ph ph-clock"></i> ~${min} min`;
 
-        // FIX PERCENTUALE URL
-        // Calcoliamo lo spazio occupato SOLO dal payload rispetto allo spazio rimanente disponibile
+        // URL Percent logic
         const currentUrl = window.location.href;
-        const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-        const baseLen = baseUrl.length;
-        
-        // Se non c'è hash (payload vuoto), usage è 0%
+        const baseLen = (window.location.protocol + "//" + window.location.host + window.location.pathname).length;
         if (text.length === 0) {
-             const uEl = document.getElementById('urlUsage');
-             uEl.innerText = "Memoria: 0%";
-             uEl.style.color = "var(--primary)";
+             document.getElementById('urlUsage').innerText = "Memoria: 0%";
              return;
         }
-
-        const totalLen = currentUrl.length;
-        const usedSpace = totalLen - baseLen; // Spazio usato dopo il dominio
-        const availableSpace = MAX_SAFE_URL - baseLen; // Spazio teorico disponibile
-        
-        let p = Math.round((usedSpace / availableSpace) * 100);
-        if (p < 0) p = 0; // Just in case
-
+        const usedSpace = currentUrl.length - baseLen;
+        let p = Math.round((usedSpace / MAX_SAFE_URL) * 100);
         const uEl = document.getElementById('urlUsage');
         uEl.innerText = `Memoria: ${p}%`;
-        
-        if (p > 90) uEl.style.color = 'var(--danger)';
-        else if (p > 70) uEl.style.color = 'var(--warning)';
-        else uEl.style.color = 'var(--primary)';
+        uEl.style.color = p > 90 ? 'var(--danger)' : (p > 70 ? 'var(--warning)' : 'var(--primary)');
     }
 
-    // --- Password System ---
+    // --- Password & Security ---
     function checkStrength(val) {
         const bar = document.getElementById('strengthBar');
-        const txt = document.getElementById('strengthText');
-        
-        if(!val) { bar.style.width = '0%'; txt.innerText = ''; return; }
-
+        if(!val) { bar.style.width = '0%'; return; }
         let score = 0;
         if (val.length > 7) score++;
         if (val.length > 12) score++;
         if (/[A-Z]/.test(val)) score++;
         if (/[0-9]/.test(val)) score++;
         if (/[^A-Za-z0-9]/.test(val)) score++;
-
-        let color = 'var(--danger)'; let label = 'Debole'; let width = '30%';
-        if (score > 2) { color = 'var(--warning)'; label = 'Media'; width = '60%'; }
-        if (score > 4) { color = 'var(--success)'; label = 'Forte'; width = '100%'; }
-
-        bar.style.background = color; bar.style.width = width;
-        txt.style.color = color; txt.innerText = label;
-    }
-
-    function generateSecurePassword() {
-        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-        let pwd = "";
-        const array = new Uint32Array(16);
-        window.crypto.getRandomValues(array);
-        for (let i = 0; i < 16; i++) pwd += chars[array[i] % chars.length];
         
-        const input = document.getElementById('passwordInput');
-        input.value = pwd;
-        input.type = "text"; 
-        
-        // Reset icon to 'eye-slash' because text is visible
-        const btn = input.nextElementSibling;
-        btn.querySelector('i').classList.replace('ph-eye', 'ph-eye-slash');
-
-        checkStrength(pwd);
-        showToast("Password sicura generata", "success");
+        let color = '#ef4444'; let width = '30%';
+        if (score > 2) { color = '#f59e0b'; width = '60%'; }
+        if (score > 4) { color = '#10b981'; width = '100%'; }
+        bar.style.backgroundColor = color; bar.style.width = width;
     }
 
     function toggleVisibility(inputId, btn) {
@@ -461,28 +645,26 @@
             currentPassword = pwd;
             closeModal('passwordModal');
             updateURLAndBroadcast();
-            showToast("Nota Cifrata con successo", "success");
+            showToast("Nota Cifrata", "success");
         }
     }
 
     function attemptDecrypt() {
         const pwd = document.getElementById('decryptInput').value;
         const inp = document.getElementById('decryptInput');
-        
         try {
             const jsonStr = LZString.decompressFromEncodedURIComponent(encryptedPayloadCache);
             const data = JSON.parse(jsonStr);
-            // Verify HMAC
             const calcedSig = CryptoJS.HmacSHA256(data.ct, pwd).toString();
-            if (calcedSig !== data.sig) throw new Error("Firma non valida");
+            if (calcedSig !== data.sig) throw new Error("Firma invalida");
 
             const bytes = CryptoJS.AES.decrypt(data.ct, pwd);
             const txt = bytes.toString(CryptoJS.enc.Utf8);
             if (!txt) throw new Error("Encoding errato");
 
-            // Success
             ignoreChange = true;
             editor.value = txt;
+            historyMgr.reset(txt);
             updatePreview();
             ignoreChange = false;
             
@@ -490,149 +672,111 @@
             updateSecurityUI(true);
             closeModal('decryptModal');
             showToast("Nota Sbloccata", "success");
-
         } catch (e) {
-            inp.classList.add('shake');
+            inp.style.borderColor = 'var(--danger)';
             showToast("Password Errata", "error");
-            setTimeout(() => inp.classList.remove('shake'), 500);
+            setTimeout(() => inp.style.borderColor = 'var(--border)', 500);
         }
     }
 
-    // --- P2P System ---
+    // --- P2P Logic ---
     function handleLiveClick() {
         if (isGuest || isHost) disconnectP2P();
         else startPeerHost();
     }
 
     function startPeerHost() {
-        showToast("Avvio Server P2P...", "info");
+        showToast("Avvio Server...", "info");
         peer = new Peer();
         peer.on('open', (id) => {
             isHost = true;
-            updateLiveUI(true, "Host");
+            updateLiveUI(true, "HOST");
             history.pushState(null, null, `#peer=${id}`);
             navigator.clipboard.writeText(window.location.href);
-            showToast("Sei LIVE! Link copiato.", "success");
-            openQRModal(); // Auto open QR
-            
+            showToast("Link LIVE copiato!", "success");
+            openQRModal();
             peer.on('connection', (c) => {
-                handleConnection(c);
-                showToast("Un utente si è collegato", "success");
+                conn = c;
+                setupConnection();
+                showToast("Ospite connesso", "success");
             });
         });
     }
 
     function initPeerGuest(hostId) {
         editor.setAttribute('readonly', true);
-        editor.value = "Connessione sicura all'Host...";
-        showToast("Ricerca Host P2P...", "info");
+        editor.value = "Connessione all'Host...";
+        showToast("Connessione P2P...", "info");
         peer = new Peer();
         peer.on('open', () => {
             isGuest = true;
             conn = peer.connect(hostId);
-            updateLiveUI(true, "Guest");
-            handleConnection(conn);
-        });
-        peer.on('error', () => { 
-            showToast("Impossibile connettersi all'Host", "error"); 
-            editor.value = "Errore connessione."; 
+            updateLiveUI(true, "GUEST");
+            setupConnection();
         });
     }
 
-    function handleConnection(connection) {
-        conn = connection;
+    function setupConnection() {
         conn.on('open', () => {
             if (isHost) updateURLAndBroadcast();
             if (isGuest) editor.removeAttribute('readonly');
         });
         conn.on('data', (data) => {
-            if (data.type === 'update') processIncomingData(data);
+            if (data.type === 'update') {
+                if(data.mode === 'lz') {
+                     const txt = LZString.decompressFromEncodedURIComponent(data.data);
+                     if(txt) { editor.value = txt; updatePreview(); }
+                } else if(data.mode === 'enc') {
+                     encryptedPayloadCache = data.data;
+                     if(!currentPassword) openModal('decryptModal');
+                     updateSecurityUI(true);
+                }
+            }
         });
         conn.on('close', () => {
-            showToast("Sessione P2P Terminata", "error");
+            showToast("P2P Terminato", "info");
             disconnectP2P();
         });
-    }
-
-    function processIncomingData(data) {
-        // Logica ricezione dati Host->Guest
-        if (data.mode === 'enc') {
-            encryptedPayloadCache = data.data;
-            updateSecurityUI(true);
-            // Tentativo auto-decrypt se guest ha già la password
-            if (currentPassword) {
-                try {
-                    const jsonStr = LZString.decompressFromEncodedURIComponent(data.data);
-                    const pkg = JSON.parse(jsonStr);
-                    const sig = CryptoJS.HmacSHA256(pkg.ct, currentPassword).toString();
-                    if (sig === pkg.sig) {
-                        const bytes = CryptoJS.AES.decrypt(pkg.ct, currentPassword);
-                        editor.value = bytes.toString(CryptoJS.enc.Utf8);
-                        updatePreview();
-                        return;
-                    }
-                } catch(e) {}
-            }
-            if(!document.getElementById('decryptModal').classList.contains('open')) openModal('decryptModal');
-        } else if (data.mode === 'lz') {
-            const txt = LZString.decompressFromEncodedURIComponent(data.data);
-            if(txt !== null) {
-                editor.value = txt;
-                updatePreview();
-            }
-            updateSecurityUI(false);
-            if (document.getElementById('decryptModal').classList.contains('open')) closeModal('decryptModal');
-        }
     }
 
     function disconnectP2P() {
         if(conn) conn.close();
         if(peer) peer.destroy();
         peer = null; conn = null; isHost = false; isGuest = false;
-        
         updateLiveUI(false);
-        updateURLAndBroadcast(); // Ripristina URL standard
         editor.removeAttribute('readonly');
-        showToast("Disconnesso da P2P", "info");
+        updateURLAndBroadcast();
     }
 
     // --- UI Helpers ---
+    function setupEnterKey(id, cb) {
+        document.getElementById(id).addEventListener('keydown', (e) => { if(e.key === 'Enter') cb(); });
+    }
     function openModal(id) { document.getElementById(id).classList.add('open'); }
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-
+    
     function openPasswordModal() {
         document.getElementById('passwordInput').value = '';
         checkStrength('');
         openModal('passwordModal');
         setTimeout(() => document.getElementById('passwordInput').focus(), 100);
     }
-
+    
     function openQRModal() {
         openModal('qrModal');
-        const container = document.getElementById('qrcode');
-        container.innerHTML = '';
-        const desc = document.getElementById('qrTextDesc');
-        
-        desc.innerHTML = isHost 
-            ? "<strong style='color:var(--danger)'>SESSIONE LIVE P2P</strong><br>Scansiona per connetterti."
-            : "Scansiona per aprire questa nota.";
-
-        new QRCode(container, { 
-            text: window.location.href, 
-            width: 200, height: 200, 
-            colorDark: "#000000", colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.M 
-        });
+        const c = document.getElementById('qrcode'); c.innerHTML = '';
+        document.getElementById('qrTextDesc').innerText = isHost ? "Scansiona per unirti alla sessione LIVE." : "Scansiona per portare la nota su mobile.";
+        new QRCode(c, { text: window.location.href, width: 180, height: 180 });
     }
 
-    function updateLiveUI(active, role) {
+    function updateLiveUI(active, label) {
         const btn = document.getElementById('btnLive');
         const badge = document.getElementById('liveBadge');
-        if (active) {
+        if(active) {
             btn.classList.add('danger');
             btn.innerHTML = `<i class="ph ph-stop-circle"></i> <span>Stop</span>`;
             badge.style.display = 'inline-flex';
-            badge.innerHTML = `<i class="ph ph-broadcast"></i> ${role}`;
+            badge.innerText = label;
         } else {
             btn.classList.remove('danger');
             btn.innerHTML = `<i class="ph ph-broadcast"></i> <span>P2P</span>`;
@@ -643,56 +787,47 @@
     function updateSecurityUI(isSecure) {
         const badge = document.getElementById('securityBadge');
         const btn = document.getElementById('btnLock');
-        const icon = btn.querySelector('i');
-        
-        if (isSecure) {
+        if(isSecure) {
             badge.style.display = 'inline-flex';
             btn.classList.add('primary');
-            icon.classList.replace('ph-lock-open', 'ph-lock-key');
+            btn.querySelector('i').classList.replace('ph-lock-open', 'ph-lock-key');
         } else {
             badge.style.display = 'none';
             btn.classList.remove('primary');
-            icon.classList.replace('ph-lock-key', 'ph-lock-open');
+            btn.querySelector('i').classList.replace('ph-lock-key', 'ph-lock-open');
         }
     }
 
-    function showToast(msg, type = 'info') {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        
-        let icon = 'info';
-        if(type==='success') icon = 'check-circle';
-        if(type==='error') icon = 'warning-circle';
-
-        toast.innerHTML = `<i class="ph ph-${icon}"></i> ${msg}`;
-        container.appendChild(toast);
-        
-        requestAnimationFrame(() => toast.classList.add('show'));
-        setTimeout(() => { 
-            toast.classList.remove('show'); 
-            setTimeout(() => toast.remove(), 300); 
-        }, 3000);
+    function showToast(msg, type='info') {
+        const c = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        let i = 'info'; if(type==='success') i='check-circle'; if(type==='error') i='warning-circle';
+        t.innerHTML = `<i class="ph ph-${i}"></i> ${msg}`;
+        c.appendChild(t);
+        requestAnimationFrame(() => t.classList.add('show'));
+        setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
     }
 
     function copyLink() {
-        navigator.clipboard.writeText(window.location.href).then(() => showToast("Link copiato negli appunti!", "success"));
+        navigator.clipboard.writeText(window.location.href);
+        showToast("Link copiato", "success");
+    }
+
+    function toggleZenMode() {
+        document.body.classList.toggle('zen-mode');
+        showToast(document.body.classList.contains('zen-mode') ? "Zen Mode: On" : "Zen Mode: Off");
     }
 
     function toggleTheme() {
-        const b = document.body;
-        const current = b.getAttribute('data-theme');
+        const current = document.body.getAttribute('data-theme');
         setTheme(current === 'dark' ? 'light' : 'dark');
     }
 
-    function setTheme(theme) {
-        document.body.setAttribute('data-theme', theme);
-        const icon = document.querySelector('#btnTheme i');
-        if(theme === 'dark') {
-            icon.classList.replace('ph-moon', 'ph-sun');
-        } else {
-            icon.classList.replace('ph-sun', 'ph-moon');
-        }
+    function setTheme(t) {
+        document.body.setAttribute('data-theme', t);
+        const i = document.querySelector('#btnTheme i');
+        i.classList.replace(t==='dark'?'ph-moon':'ph-sun', t==='dark'?'ph-sun':'ph-moon');
     }
 </script>
 </body>
