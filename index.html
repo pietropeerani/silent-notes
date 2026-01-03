@@ -1,187 +1,265 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Silent Notes</title>
     
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
         :root {
-            --bg-color: #f4f4f5;
-            --text-color: #18181b;
-            --editor-bg: #ffffff;
-            --border-color: #e4e4e7;
-            --accent: #3b82f6;
-            --danger: #ef4444;
-            --success: #22c55e;
+            --bg: #fafafa; --text: #18181b; --surface: #ffffff; --border: #e4e4e7;
+            --primary: #52525b; --accent: #2563eb; --accent-fg: #ffffff;
+            --danger: #ef4444; --success: #10b981; --warning: #f59e0b;
+            --font-ui: 'Inter', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --shadow: 0 4px 12px -2px rgba(0,0,0,0.08);
         }
 
         [data-theme="dark"] {
-            --bg-color: #18181b;
-            --text-color: #f4f4f5;
-            --editor-bg: #27272a;
-            --border-color: #3f3f46;
-            --accent: #60a5fa;
+            --bg: #09090b; --text: #e4e4e7; --surface: #18181b; --border: #27272a; 
+            --primary: #a1a1aa; --accent: #3b82f6;
         }
 
-        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; height: 100vh; display: flex; flex-direction: column; }
-        
-        header { padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: var(--editor-bg); }
-        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-        
-        main { flex: 1; display: flex; overflow: hidden; }
-        .pane { flex: 1; display: flex; flex-direction: column; padding: 1rem; overflow-y: auto; }
-        .pane.editor { border-right: 1px solid var(--border-color); }
-        
-        textarea { width: 100%; height: 100%; border: none; resize: none; outline: none; background: transparent; color: var(--text-color); font-size: 1rem; font-family: 'Courier New', monospace; }
-        
-        #preview img { max-width: 100%; }
-        #preview blockquote { border-left: 4px solid var(--accent); margin-left: 0; padding-left: 1rem; color: #71717a; }
+        * { box-sizing: border-box; outline: none; }
+        body { margin: 0; font-family: var(--font-ui); background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; transition: background 0.3s, color 0.3s; }
 
-        button { padding: 0.5rem 1rem; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); cursor: pointer; border-radius: 4px; font-size: 0.9rem; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
-        button:hover { background: var(--border-color); }
-        button.active { background: var(--accent); color: white; border-color: var(--accent); }
-        button.disconnect { background: var(--danger); color: white; border-color: var(--danger); }
+        /* --- Header --- */
+        header { padding: 0.8rem 1.2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface); z-index: 20; transition: transform 0.3s; }
+        .logo { font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; user-select: none; }
+        .toolbar { display: flex; gap: 6px; align-items: center; }
+
+        /* Buttons */
+        button { padding: 0.5rem; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s; font-size: 0.9rem; }
+        button:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+        button.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+        button.primary:hover { opacity: 0.9; transform: translateY(-1px); }
+        button.danger { border-color: var(--danger); color: var(--danger); }
+        button.danger:hover { background: var(--danger); color: white; }
         
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: var(--editor-bg); padding: 2rem; border-radius: 8px; max-width: 400px; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
-        input[type="password"] { width: 100%; padding: 0.5rem; margin: 1rem 0; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); border-radius: 4px; box-sizing: border-box; }
-        
-        .stats { font-size: 0.8rem; color: #71717a; margin-top: auto; padding: 0.5rem 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; background: var(--editor-bg); }
-        
-        #qrcode { margin-top: 1rem; display: flex; justify-content: center; }
-        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-left: 5px; }
+        button span { font-weight: 500; font-size: 0.8rem; }
+        button i { font-size: 1.1rem; }
+
+        /* --- Main Layout --- */
+        main { flex: 1; display: flex; overflow: hidden; position: relative; }
+        .pane { flex: 1; display: flex; flex-direction: column; overflow-y: auto; transition: width 0.3s; }
+        .pane.editor { border-right: 1px solid var(--border); padding: 1.5rem; }
+        .pane.preview { padding: 1.5rem 2rem; background: var(--surface); }
+
+        /* Editor */
+        textarea { width: 100%; height: 100%; border: none; resize: none; background: transparent; color: var(--text); font-size: 1rem; line-height: 1.6; font-family: var(--font-mono); padding: 0; }
+        textarea::placeholder { color: var(--primary); opacity: 0.5; }
+
+        /* Preview Markdown Styles */
+        #preview { line-height: 1.7; font-size: 1rem; color: var(--text); }
+        #preview h1, #preview h2, #preview h3 { margin-top: 1.5em; margin-bottom: 0.5em; color: var(--text); letter-spacing: -0.02em; }
+        #preview h1 { border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+        #preview a { color: var(--accent); text-decoration: none; }
+        #preview a:hover { text-decoration: underline; }
+        #preview blockquote { border-left: 3px solid var(--accent); margin: 1em 0; padding-left: 1rem; color: var(--primary); font-style: italic; }
+        #preview code { background: var(--border); padding: 0.2em 0.4em; border-radius: 4px; font-family: var(--font-mono); font-size: 0.85em; }
+        #preview pre { background: #1e1e1e; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+        #preview pre code { background: transparent; padding: 0; color: #e4e4e7; }
+        #preview img { max-width: 100%; border-radius: 6px; box-shadow: var(--shadow); }
+        #preview ul, #preview ol { padding-left: 1.5rem; }
+
+        /* --- Zen Mode --- */
+        body.zen-mode header, body.zen-mode .footer, body.zen-mode .pane.preview { display: none !important; }
+        body.zen-mode .pane.editor { border-right: none; max-width: 800px; margin: 0 auto; padding-top: 4rem; }
+        body.zen-mode #btnZenExit { display: flex; }
+
+        #btnZenExit { display: none; position: fixed; top: 20px; right: 20px; z-index: 50; opacity: 0.5; }
+        #btnZenExit:hover { opacity: 1; }
+
+        /* --- Footer --- */
+        .footer { padding: 0.4rem 1.2rem; border-top: 1px solid var(--border); background: var(--surface); font-size: 0.75rem; color: var(--primary); display: flex; justify-content: space-between; align-items: center; z-index: 20; }
+        .stats { display: flex; gap: 15px; }
+
+        /* Badges */
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
         .badge.secure { background: var(--success); color: white; }
         .badge.live { background: var(--danger); color: white; animation: pulse 2s infinite; }
-        
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
+        /* --- Modals --- */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); z-index: 100; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.2s; }
+        .modal.open { display: flex; opacity: 1; }
+        .modal-content { background: var(--surface); padding: 2rem; border-radius: 12px; width: 90%; max-width: 360px; box-shadow: var(--shadow); border: 1px solid var(--border); transform: translateY(10px); transition: transform 0.2s; }
+        .modal.open .modal-content { transform: translateY(0); }
+        .modal h3 { margin-top: 0; display: flex; align-items: center; gap: 10px; font-size: 1.1rem; }
+        
+        .pwd-row { display: flex; gap: 8px; margin-bottom: 10px; margin-top: 15px; }
+        .pwd-row input { flex: 1; padding: 0.7rem; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 6px; font-family: var(--font-mono); font-size: 1rem; }
+        .pwd-row input:focus { border-color: var(--accent); }
+        
+        .strength-bar { height: 4px; border-radius: 2px; background: var(--border); width: 0%; transition: width 0.3s, background 0.3s; margin-top: 6px; }
+        .strength-text { font-size: 0.7rem; margin-top: 4px; display: block; text-align: right; font-weight: 600; min-height: 1rem; }
+        
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; }
+
+        /* --- Toasts --- */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; display: flex; flex-direction: column; gap: 10px; z-index: 200; pointer-events: none; }
+        .toast { background: var(--surface); color: var(--text); padding: 12px 18px; border-radius: 8px; box-shadow: var(--shadow); border: 1px solid var(--border); border-left: 4px solid var(--text); display: flex; align-items: center; gap: 12px; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: auto; font-size: 0.9rem; font-weight: 500; }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--danger); }
+
+        #qrcode { display: flex; justify-content: center; margin: 1.5rem 0; padding: 1rem; background: white; border-radius: 8px; }
+
+        /* Mobile Responsive */
         @media (max-width: 768px) {
             main { flex-direction: column; }
-            .pane.editor { border-right: none; border-bottom: 1px solid var(--border-color); height: 50%; }
+            .pane { height: 50%; padding: 1rem; }
+            .pane.editor { border-right: none; border-bottom: 1px solid var(--border); }
             .toolbar button span { display: none; }
+            .footer { flex-direction: column; gap: 5px; align-items: flex-start; }
         }
     </style>
 </head>
 <body>
 
+<button id="btnZenExit" onclick="toggleZenMode()" title="Esci da Zen Mode"><i class="ph ph-arrows-in"></i></button>
+
 <header>
-    <div style="font-weight: bold; display: flex; align-items: center;">
-        Silent Notes
-        <span id="securityBadge" class="badge secure" style="display:none">SECURE</span>
-        <span id="liveBadge" class="badge live" style="display:none">● LIVE</span>
+    <div class="logo">
+        <i class="ph ph-notebook" style="color: var(--accent)"></i> Silent Notes
+        <span id="securityBadge" class="badge secure" style="display:none"><i class="ph ph-lock-key"></i> SECURE</span>
+        <span id="liveBadge" class="badge live" style="display:none"><i class="ph ph-broadcast"></i> LIVE</span>
     </div>
     <div class="toolbar">
-        <button onclick="toggleTheme()" title="Theme">🌓</button>
-        <button onclick="handleLiveClick()" id="btnLive" title="Realtime P2P">📡 <span>P2P</span></button>
-        <button onclick="showPasswordModal()" id="btnLock" title="Password Protection">🔒</button>
-        <button onclick="showQR()" title="QR Code">📱 <span>QR</span></button>
-        <button onclick="copyLink()" title="Copy Link">🔗</button>
+        <button onclick="toggleZenMode()" title="Zen Mode (Focus)"><i class="ph ph-frame-corners"></i></button>
+        <button onclick="toggleTheme()" id="btnTheme" title="Tema"><i class="ph ph-moon"></i></button>
+        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+        <button onclick="downloadNote()" title="Scarica File .md"><i class="ph ph-download-simple"></i></button>
+        <button onclick="handleLiveClick()" id="btnLive" title="P2P Session"><i class="ph ph-broadcast"></i> <span>P2P</span></button>
+        <button onclick="openPasswordModal()" id="btnLock" title="Sicurezza"><i class="ph ph-lock-open"></i></button>
+        <button onclick="openQRModal()" title="Mobile QR"><i class="ph ph-qr-code"></i></button>
+        <button onclick="copyLink()" class="primary" title="Salva/Copia"><i class="ph ph-link"></i> <span>Copia Link</span></button>
     </div>
 </header>
 
 <main>
     <div class="pane editor">
-        <textarea id="editor" placeholder="Type here... (Markdown supported)"></textarea>
+        <textarea id="editor" placeholder="# Benvenuto su Silent Notes&#10;Inizia a scrivere qui. Tutto viene salvato nell'URL.&#10;&#10;- Nessun server&#10;- Crittografia AES&#10;- Markdown supportato"></textarea>
     </div>
     <div class="pane preview">
         <div id="preview"></div>
     </div>
 </main>
 
-<div class="stats">
-    <span id="charCount">0 chars</span>
-    <span id="urlUsage">URL: 0%</span>
+<div class="footer">
+    <div class="stats">
+        <span id="charCount"><i class="ph ph-text-t"></i> 0</span>
+        <span id="readTime"><i class="ph ph-clock"></i> 0 min</span>
+    </div>
+    <span id="urlUsage">Memoria: 0%</span>
 </div>
+
+<div id="toast-container"></div>
 
 <div id="passwordModal" class="modal">
     <div class="modal-content">
-        <h3>🔐 Set Password</h3>
-        <p>Encrypt this note before sharing.</p>
-        <input type="password" id="passwordInput" placeholder="New Password">
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button onclick="closeModal()">Cancel</button>
-            <button onclick="applyPassword()" class="active">Protect</button>
+        <h3><i class="ph ph-shield-check"></i> Proteggi Nota</h3>
+        <p style="font-size: 0.9rem; color: var(--primary); margin:0;">Crittografia AES-256 lato client.</p>
+        
+        <div class="pwd-row">
+            <input type="password" id="passwordInput" placeholder="Scegli password..." oninput="checkStrength(this.value)">
+            <button onclick="toggleVisibility('passwordInput', this)" title="Vedi"><i class="ph ph-eye"></i></button>
+            <button onclick="generateSecurePassword()" title="Genera"><i class="ph ph-magic-wand"></i></button>
+        </div>
+        
+        <div id="strengthBar" class="strength-bar"></div>
+        <span id="strengthText" class="strength-text"></span>
+
+        <div class="modal-actions">
+            <button onclick="closeModal('passwordModal')">Annulla</button>
+            <button onclick="applyPassword()" class="primary">Applica</button>
         </div>
     </div>
 </div>
 
 <div id="decryptModal" class="modal">
     <div class="modal-content">
-        <h3>🔓 Encrypted Note</h3>
-        <p>Enter password to view content.</p>
-        <input type="password" id="decryptInput" placeholder="Password">
-        <button onclick="attemptDecrypt()" class="active" style="width: 100%">Unlock</button>
-        <div id="decryptError" style="color: var(--danger); margin-top: 10px; font-size: 0.9rem; display: none;">Invalid Password</div>
+        <h3><i class="ph ph-lock-key"></i> Nota Cifrata</h3>
+        <p style="font-size: 0.9rem; color: var(--primary); margin:0;">Questa nota è protetta.</p>
+        <div class="pwd-row">
+            <input type="password" id="decryptInput" placeholder="Inserisci password">
+            <button onclick="toggleVisibility('decryptInput', this)"><i class="ph ph-eye"></i></button>
+        </div>
+        <div class="modal-actions">
+            <button onclick="attemptDecrypt()" class="primary" style="width: 100%">Sblocca Nota</button>
+        </div>
     </div>
 </div>
 
-<div id="qrModal" class="modal" onclick="if(event.target === this) this.style.display='none'">
+<div id="qrModal" class="modal" onclick="if(event.target === this) closeModal('qrModal')">
     <div class="modal-content" style="text-align: center;">
-        <h3>Scan to Share</h3>
+        <h3>Codice QR</h3>
+        <p id="qrTextDesc" style="font-size: 0.85rem; color: var(--primary);">Scansiona per portare la nota su mobile.</p>
         <div id="qrcode"></div>
+        <button onclick="closeModal('qrModal')" style="margin-top:10px">Chiudi</button>
     </div>
 </div>
 
 <script>
-    // --- Global State ---
+    // --- Configurazione ---
     const editor = document.getElementById('editor');
     const preview = document.getElementById('preview');
-    const MAX_URL_LENGTH = 2000;
+    // Limite di sicurezza per URL nei browser (2048 è standard sicuro, anche se Chrome supporta di più)
+    const MAX_SAFE_URL = 2000; 
     
     let currentPassword = null;
-    let encryptedPayloadCache = null; // Stores encrypted data while waiting for password
-    
-    // P2P State
+    let encryptedPayloadCache = null;
     let peer = null;
     let conn = null;
-    let isHost = false; 
-    let isGuest = false; 
-    let ignoreChange = false; // Prevents infinite loop during programmatic updates
+    let isHost = false;
+    let isGuest = false;
+    let ignoreChange = false;
 
-    // --- Initialization ---
+    // --- Inizializzazione ---
     window.addEventListener('DOMContentLoaded', () => {
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) toggleTheme();
-        checkHash(); 
+        // Setup Highlight.js e Marked
+        marked.setOptions({
+            highlight: function(code, lang) {
+                const language = highlight.getLanguage(lang) ? lang : 'plaintext';
+                return highlight.highlight(code, { language }).value;
+            },
+            langPrefix: 'hljs language-' // necessario per highlight.js
+        });
+
+        // Setup Tema
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            setTheme('dark');
+        } else {
+            setTheme('light');
+        }
+        
+        // Listeners
+        setupEnterKey('passwordInput', applyPassword);
+        setupEnterKey('decryptInput', attemptDecrypt);
+        
+        checkHash();
+        updateStats(); // Initial stats check
     });
 
-    // Handle back/forward buttons
     window.addEventListener('hashchange', checkHash);
 
-    function checkHash() {
-        if (ignoreChange) return;
-
-        const hash = window.location.hash.substring(1);
-        if (!hash) return;
-
-        const [key, val] = hash.split('=');
-
-        if (key === 'peer') {
-            // User opened a P2P link (Guest mode)
-            if (!isGuest && !isHost) initPeerGuest(val);
-        } else if (key === 'enc') {
-            // Encrypted content found in URL
-            encryptedPayloadCache = val;
-            currentPassword = null; 
-            showDecryptModal();
-        } else if (key === 'lz') {
-            // Standard compressed content
-            const decompressed = LZString.decompressFromEncodedURIComponent(val);
-            if (decompressed !== null) {
-                editor.value = decompressed;
-                updatePreview();
-            }
-        }
+    function setupEnterKey(id, callback) {
+        document.getElementById(id).addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') callback();
+        });
     }
 
-    // --- Editor & Core Logic ---
+    // --- Core Logic ---
     editor.addEventListener('input', () => {
         if (ignoreChange) return;
         updatePreview();
@@ -193,19 +271,50 @@
         updateStats();
     }
 
-    // Generates the data blob (Compressed or Encrypted+Compressed)
+    function checkHash() {
+        if (ignoreChange) return;
+        const hash = window.location.hash.substring(1);
+        
+        // Se hash vuoto, pulisci editor
+        if (!hash) {
+            if(editor.value !== "") {
+                 editor.value = "";
+                 updatePreview();
+            }
+            return;
+        }
+
+        const [key, val] = hash.split('=');
+
+        if (key === 'peer') {
+            if (!isGuest && !isHost) initPeerGuest(val);
+        } else if (key === 'enc') {
+            encryptedPayloadCache = val;
+            currentPassword = null;
+            openModal('decryptModal');
+            setTimeout(() => document.getElementById('decryptInput').focus(), 100);
+        } else if (key === 'lz') {
+            try {
+                const txt = LZString.decompressFromEncodedURIComponent(val);
+                if (txt !== null) { 
+                    editor.value = txt; 
+                    updatePreview(); 
+                }
+            } catch(e) { console.error("Errore decompressione", e); }
+        }
+    }
+
     function generatePayload() {
         const text = editor.value;
         if (!text) return { mode: 'raw', data: '' };
 
         if (currentPassword) {
-            // Encrypt -> Sign (HMAC) -> Stringify -> Compress
             const encrypted = CryptoJS.AES.encrypt(text, currentPassword).toString();
+            // HMAC per integrità
             const signature = CryptoJS.HmacSHA256(encrypted, currentPassword).toString();
             const packed = JSON.stringify({ ct: encrypted, sig: signature });
             return { mode: 'enc', data: LZString.compressToEncodedURIComponent(packed) };
         } else {
-            // Compress only
             return { mode: 'lz', data: LZString.compressToEncodedURIComponent(text) };
         }
     }
@@ -213,269 +322,378 @@
     function updateURLAndBroadcast() {
         const payload = generatePayload();
         
-        // Update URL history only if NOT a guest
-        // Guests keep the #peer=ID hash to maintain connection context
         if (!isGuest) {
-            const hash = payload.data ? `#${payload.mode}=${payload.data}` : ' ';
-            history.replaceState(null, null, hash);
+            // FIX PERCENTUALE: Se non ci sono dati, rimuovi l'hash completamente
+            if (!payload.data) {
+                history.replaceState(null, null, ' '); // Rimuove hash mantenendo la pagina
+            } else {
+                const hash = `#${payload.mode}=${payload.data}`;
+                if(!isHost) history.replaceState(null, null, hash);
+            }
         }
 
         updateSecurityUI(payload.mode === 'enc');
+        updateStats(); // Ricalcola stats dopo update URL
 
-        // Broadcast to P2P peer if connected
         if (conn && conn.open) {
             conn.send({ type: 'update', mode: payload.mode, data: payload.data });
         }
     }
 
-    function updateSecurityUI(isSecure) {
-        const badge = document.getElementById('securityBadge');
-        const btn = document.getElementById('btnLock');
+    // --- Features Avanzate ---
+    
+    function toggleZenMode() {
+        document.body.classList.toggle('zen-mode');
+        showToast(document.body.classList.contains('zen-mode') ? "Zen Mode Attiva" : "Zen Mode Disattivata");
+    }
+
+    function downloadNote() {
+        const text = editor.value;
+        if(!text) { showToast("Niente da scaricare", "error"); return; }
         
-        if (isSecure) {
-            badge.style.display = 'inline-block';
-            btn.classList.add('active');
-        } else {
-            badge.style.display = 'none';
-            btn.classList.remove('active');
+        const blob = new Blob([text], { type: "text/markdown" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "silent-note.md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast("Nota scaricata!", "success");
+    }
+
+    // --- Stats & Logic Percentuale ---
+    function updateStats() {
+        const text = editor.value;
+        
+        // Conteggio parole e caratteri
+        const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+        document.getElementById('charCount').innerHTML = `<i class="ph ph-text-t"></i> ${text.length} car | ${words} parole`;
+        
+        // Tempo lettura (media 200 parole/min)
+        const min = Math.ceil(words / 200);
+        document.getElementById('readTime').innerHTML = `<i class="ph ph-clock"></i> ~${min} min`;
+
+        // FIX PERCENTUALE URL
+        // Calcoliamo lo spazio occupato SOLO dal payload rispetto allo spazio rimanente disponibile
+        const currentUrl = window.location.href;
+        const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        const baseLen = baseUrl.length;
+        
+        // Se non c'è hash (payload vuoto), usage è 0%
+        if (text.length === 0) {
+             const uEl = document.getElementById('urlUsage');
+             uEl.innerText = "Memoria: 0%";
+             uEl.style.color = "var(--primary)";
+             return;
         }
+
+        const totalLen = currentUrl.length;
+        const usedSpace = totalLen - baseLen; // Spazio usato dopo il dominio
+        const availableSpace = MAX_SAFE_URL - baseLen; // Spazio teorico disponibile
+        
+        let p = Math.round((usedSpace / availableSpace) * 100);
+        if (p < 0) p = 0; // Just in case
+
+        const uEl = document.getElementById('urlUsage');
+        uEl.innerText = `Memoria: ${p}%`;
+        
+        if (p > 90) uEl.style.color = 'var(--danger)';
+        else if (p > 70) uEl.style.color = 'var(--warning)';
+        else uEl.style.color = 'var(--primary)';
     }
 
-    // --- Password Management ---
-    function showPasswordModal() {
-        document.getElementById('passwordModal').style.display = 'flex';
-        document.getElementById('passwordInput').focus();
+    // --- Password System ---
+    function checkStrength(val) {
+        const bar = document.getElementById('strengthBar');
+        const txt = document.getElementById('strengthText');
+        
+        if(!val) { bar.style.width = '0%'; txt.innerText = ''; return; }
+
+        let score = 0;
+        if (val.length > 7) score++;
+        if (val.length > 12) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/[0-9]/.test(val)) score++;
+        if (/[^A-Za-z0-9]/.test(val)) score++;
+
+        let color = 'var(--danger)'; let label = 'Debole'; let width = '30%';
+        if (score > 2) { color = 'var(--warning)'; label = 'Media'; width = '60%'; }
+        if (score > 4) { color = 'var(--success)'; label = 'Forte'; width = '100%'; }
+
+        bar.style.background = color; bar.style.width = width;
+        txt.style.color = color; txt.innerText = label;
     }
 
-    function showDecryptModal() {
-        document.getElementById('decryptModal').style.display = 'flex';
-        document.getElementById('decryptError').style.display = 'none';
-        document.getElementById('decryptInput').focus();
+    function generateSecurePassword() {
+        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+        let pwd = "";
+        const array = new Uint32Array(16);
+        window.crypto.getRandomValues(array);
+        for (let i = 0; i < 16; i++) pwd += chars[array[i] % chars.length];
+        
+        const input = document.getElementById('passwordInput');
+        input.value = pwd;
+        input.type = "text"; 
+        
+        // Reset icon to 'eye-slash' because text is visible
+        const btn = input.nextElementSibling;
+        btn.querySelector('i').classList.replace('ph-eye', 'ph-eye-slash');
+
+        checkStrength(pwd);
+        showToast("Password sicura generata", "success");
     }
 
-    function closeModal() {
-        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+    function toggleVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.replace('ph-eye', 'ph-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.replace('ph-eye-slash', 'ph-eye');
+        }
     }
 
     function applyPassword() {
         const pwd = document.getElementById('passwordInput').value;
         if (pwd) {
             currentPassword = pwd;
-            closeModal();
+            closeModal('passwordModal');
             updateURLAndBroadcast();
-            alert("Note protected.");
+            showToast("Nota Cifrata con successo", "success");
         }
     }
 
     function attemptDecrypt() {
         const pwd = document.getElementById('decryptInput').value;
-        const payload = encryptedPayloadCache;
+        const inp = document.getElementById('decryptInput');
         
         try {
-            const jsonStr = LZString.decompressFromEncodedURIComponent(payload);
+            const jsonStr = LZString.decompressFromEncodedURIComponent(encryptedPayloadCache);
             const data = JSON.parse(jsonStr);
-            
-            // Verify HMAC signature
+            // Verify HMAC
             const calcedSig = CryptoJS.HmacSHA256(data.ct, pwd).toString();
-            if (calcedSig !== data.sig) throw new Error("Invalid Signature");
+            if (calcedSig !== data.sig) throw new Error("Firma non valida");
 
-            // Decrypt
             const bytes = CryptoJS.AES.decrypt(data.ct, pwd);
-            const originalText = bytes.toString(CryptoJS.enc.Utf8);
-            
-            if (!originalText) throw new Error("Decrypt Failed");
+            const txt = bytes.toString(CryptoJS.enc.Utf8);
+            if (!txt) throw new Error("Encoding errato");
 
             // Success
-            ignoreChange = true; 
-            editor.value = originalText;
-            currentPassword = pwd; // Cache password for session
-            ignoreChange = false;
-
+            ignoreChange = true;
+            editor.value = txt;
             updatePreview();
-            updateSecurityUI(true);
-            closeModal();
+            ignoreChange = false;
             
+            currentPassword = pwd;
+            updateSecurityUI(true);
+            closeModal('decryptModal');
+            showToast("Nota Sbloccata", "success");
+
         } catch (e) {
-            console.error(e);
-            document.getElementById('decryptError').style.display = 'block';
+            inp.classList.add('shake');
+            showToast("Password Errata", "error");
+            setTimeout(() => inp.classList.remove('shake'), 500);
         }
     }
 
-    // --- P2P / WebRTC Logic ---
-    
+    // --- P2P System ---
     function handleLiveClick() {
-        if (isGuest || isHost) {
-            disconnectP2P();
-        } else {
-            startPeerHost();
-        }
+        if (isGuest || isHost) disconnectP2P();
+        else startPeerHost();
     }
 
     function startPeerHost() {
-        peer = new Peer(); // Generates random ID
-        
+        showToast("Avvio Server P2P...", "info");
+        peer = new Peer();
         peer.on('open', (id) => {
             isHost = true;
+            updateLiveUI(true, "Host");
+            history.pushState(null, null, `#peer=${id}`);
+            navigator.clipboard.writeText(window.location.href);
+            showToast("Sei LIVE! Link copiato.", "success");
+            openQRModal(); // Auto open QR
             
-            // Update UI
-            const btn = document.getElementById('btnLive');
-            btn.classList.add('active');
-            btn.querySelector('span').innerText = "Stop Live";
-            document.getElementById('liveBadge').style.display = 'inline-block';
-            
-            // Generate Share Link
-            const liveUrl = `${window.location.origin}${window.location.pathname}#peer=${id}`;
-            
-            navigator.clipboard.writeText(liveUrl).then(() => {
-                alert("LIVE Session Started!\nLink copied to clipboard.");
-            });
-
-            peer.on('connection', (connection) => {
-                handleConnection(connection);
+            peer.on('connection', (c) => {
+                handleConnection(c);
+                showToast("Un utente si è collegato", "success");
             });
         });
     }
 
     function initPeerGuest(hostId) {
         editor.setAttribute('readonly', true);
-        editor.value = "Connecting to host...";
-        
+        editor.value = "Connessione sicura all'Host...";
+        showToast("Ricerca Host P2P...", "info");
         peer = new Peer();
         peer.on('open', () => {
             isGuest = true;
             conn = peer.connect(hostId);
-            
-            // Update UI
-            const btn = document.getElementById('btnLive');
-            btn.classList.add('disconnect');
-            btn.querySelector('span').innerText = "Disconnect";
-            
+            updateLiveUI(true, "Guest");
             handleConnection(conn);
         });
-
-        peer.on('error', (err) => {
-            alert("P2P Error: " + err);
-            editor.value = "Connection failed.";
+        peer.on('error', () => { 
+            showToast("Impossibile connettersi all'Host", "error"); 
+            editor.value = "Errore connessione."; 
         });
     }
 
     function handleConnection(connection) {
         conn = connection;
-
         conn.on('open', () => {
-            document.getElementById('liveBadge').style.display = 'inline-block';
-            document.getElementById('liveBadge').innerText = isHost ? "● HOST" : "● GUEST";
-            
-            // Host sends current state immediately upon connection
             if (isHost) updateURLAndBroadcast();
-            
-            // Guest can now edit (bi-directional sync)
             if (isGuest) editor.removeAttribute('readonly');
         });
-
         conn.on('data', (data) => {
             if (data.type === 'update') processIncomingData(data);
         });
-
         conn.on('close', () => {
-            alert("P2P Connection closed.");
+            showToast("Sessione P2P Terminata", "error");
             disconnectP2P();
         });
     }
 
     function processIncomingData(data) {
+        // Logica ricezione dati Host->Guest
         if (data.mode === 'enc') {
-            // Received Encrypted Data
             encryptedPayloadCache = data.data;
             updateSecurityUI(true);
-
-            // Try automatic decryption if we already have a password
+            // Tentativo auto-decrypt se guest ha già la password
             if (currentPassword) {
                 try {
                     const jsonStr = LZString.decompressFromEncodedURIComponent(data.data);
                     const pkg = JSON.parse(jsonStr);
                     const sig = CryptoJS.HmacSHA256(pkg.ct, currentPassword).toString();
-                    
                     if (sig === pkg.sig) {
                         const bytes = CryptoJS.AES.decrypt(pkg.ct, currentPassword);
-                        const txt = bytes.toString(CryptoJS.enc.Utf8);
-                        
-                        ignoreChange = true;
-                        editor.value = txt;
+                        editor.value = bytes.toString(CryptoJS.enc.Utf8);
                         updatePreview();
-                        ignoreChange = false;
-                        return; 
+                        return;
                     }
                 } catch(e) {}
             }
-            
-            // If automatic decryption fails, prompt user
-            if(document.getElementById('decryptModal').style.display === 'none') {
-                showDecryptModal(); 
-            }
-        
+            if(!document.getElementById('decryptModal').classList.contains('open')) openModal('decryptModal');
         } else if (data.mode === 'lz') {
-            // Received Clear Data
             const txt = LZString.decompressFromEncodedURIComponent(data.data);
-            
-            ignoreChange = true;
-            editor.value = txt;
-            updatePreview();
+            if(txt !== null) {
+                editor.value = txt;
+                updatePreview();
+            }
             updateSecurityUI(false);
-            currentPassword = null; // Reset password if host removed it
-            closeModal();
-            ignoreChange = false;
+            if (document.getElementById('decryptModal').classList.contains('open')) closeModal('decryptModal');
         }
     }
 
     function disconnectP2P() {
-        if (conn) conn.close();
-        if (peer) peer.destroy();
+        if(conn) conn.close();
+        if(peer) peer.destroy();
+        peer = null; conn = null; isHost = false; isGuest = false;
         
-        peer = null;
-        conn = null;
-        isHost = false;
-        isGuest = false;
-        
-        // Reset UI
-        const btn = document.getElementById('btnLive');
-        btn.classList.remove('active', 'disconnect');
-        btn.querySelector('span').innerText = "P2P";
-        document.getElementById('liveBadge').style.display = 'none';
-        
-        // Clean URL
-        updateURLAndBroadcast();
+        updateLiveUI(false);
+        updateURLAndBroadcast(); // Ripristina URL standard
         editor.removeAttribute('readonly');
+        showToast("Disconnesso da P2P", "info");
     }
 
-    // --- Utilities ---
-    function updateStats() {
-        const text = editor.value;
-        document.getElementById('charCount').innerText = `${text.length} chars`;
+    // --- UI Helpers ---
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function openPasswordModal() {
+        document.getElementById('passwordInput').value = '';
+        checkStrength('');
+        openModal('passwordModal');
+        setTimeout(() => document.getElementById('passwordInput').focus(), 100);
+    }
+
+    function openQRModal() {
+        openModal('qrModal');
+        const container = document.getElementById('qrcode');
+        container.innerHTML = '';
+        const desc = document.getElementById('qrTextDesc');
         
-        const urlLen = window.location.href.length;
-        const p = Math.min(100, Math.round((urlLen / MAX_URL_LENGTH) * 100));
-        const uEl = document.getElementById('urlUsage');
-        uEl.innerText = `URL: ${p}%`;
-        uEl.style.color = urlLen > MAX_URL_LENGTH ? 'var(--danger)' : 'inherit';
+        desc.innerHTML = isHost 
+            ? "<strong style='color:var(--danger)'>SESSIONE LIVE P2P</strong><br>Scansiona per connetterti."
+            : "Scansiona per aprire questa nota.";
+
+        new QRCode(container, { 
+            text: window.location.href, 
+            width: 200, height: 200, 
+            colorDark: "#000000", colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M 
+        });
+    }
+
+    function updateLiveUI(active, role) {
+        const btn = document.getElementById('btnLive');
+        const badge = document.getElementById('liveBadge');
+        if (active) {
+            btn.classList.add('danger');
+            btn.innerHTML = `<i class="ph ph-stop-circle"></i> <span>Stop</span>`;
+            badge.style.display = 'inline-flex';
+            badge.innerHTML = `<i class="ph ph-broadcast"></i> ${role}`;
+        } else {
+            btn.classList.remove('danger');
+            btn.innerHTML = `<i class="ph ph-broadcast"></i> <span>P2P</span>`;
+            badge.style.display = 'none';
+        }
+    }
+
+    function updateSecurityUI(isSecure) {
+        const badge = document.getElementById('securityBadge');
+        const btn = document.getElementById('btnLock');
+        const icon = btn.querySelector('i');
+        
+        if (isSecure) {
+            badge.style.display = 'inline-flex';
+            btn.classList.add('primary');
+            icon.classList.replace('ph-lock-open', 'ph-lock-key');
+        } else {
+            badge.style.display = 'none';
+            btn.classList.remove('primary');
+            icon.classList.replace('ph-lock-key', 'ph-lock-open');
+        }
+    }
+
+    function showToast(msg, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        let icon = 'info';
+        if(type==='success') icon = 'check-circle';
+        if(type==='error') icon = 'warning-circle';
+
+        toast.innerHTML = `<i class="ph ph-${icon}"></i> ${msg}`;
+        container.appendChild(toast);
+        
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => { 
+            toast.classList.remove('show'); 
+            setTimeout(() => toast.remove(), 300); 
+        }, 3000);
+    }
+
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => showToast("Link copiato negli appunti!", "success"));
     }
 
     function toggleTheme() {
         const b = document.body;
-        b.getAttribute('data-theme') === 'dark' ? b.removeAttribute('data-theme') : b.setAttribute('data-theme', 'dark');
+        const current = b.getAttribute('data-theme');
+        setTheme(current === 'dark' ? 'light' : 'dark');
     }
 
-    function showQR() {
-        document.getElementById('qrModal').style.display = 'flex';
-        const c = document.getElementById('qrcode');
-        c.innerHTML = '';
-        new QRCode(c, { text: window.location.href, width: 200, height: 200 });
-    }
-
-    function copyLink() {
-        navigator.clipboard.writeText(window.location.href).then(() => alert("Link copied!"));
+    function setTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        const icon = document.querySelector('#btnTheme i');
+        if(theme === 'dark') {
+            icon.classList.replace('ph-moon', 'ph-sun');
+        } else {
+            icon.classList.replace('ph-sun', 'ph-moon');
+        }
     }
 </script>
-
 </body>
 </html>
